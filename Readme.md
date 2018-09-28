@@ -1,3 +1,5 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # Battle of AI - Python library
 
 [![PyPI version](https://badge.fury.io/py/battleofai.svg)](https://badge.fury.io/py/battleofai)
