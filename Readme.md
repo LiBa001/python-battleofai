@@ -1,5 +1,7 @@
 # Battle of AI - Python library
 
+Object-oriented easy2use solution for interacting with https://battleofai.net/ \'s API.
+
 A short summary of the basic features.
 
 #### Configure your client easily.
