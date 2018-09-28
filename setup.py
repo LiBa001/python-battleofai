@@ -5,12 +5,13 @@ with open('Readme.md', 'r', encoding='utf-8') as f:
 
 setup(
     name='battleofai',
-    version='0.1.0',
+    version='0.1.1',
     description='A wrapper for the battleofai API.',
     long_description=readme,
     long_description_content_type='text/markdown',
     url='https://github.com/LiBa001/python-battleofai',
     author='Linus Bartsch',
+    author_email='linus.pypi@mabasoft.de',
     license='MIT',
     classifiers=[
         'License :: OSI Approved :: MIT License',
