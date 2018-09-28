@@ -1,5 +1,8 @@
 # Battle of AI - Python library
 
+[![PyPI version](https://badge.fury.io/py/battleofai.svg)](https://badge.fury.io/py/battleofai)
+[![Build Status](https://travis-ci.org/LiBa001/python-battleofai.svg?branch=master)](https://travis-ci.org/LiBa001/python-battleofai)
+
 Object-oriented easy2use solution for interacting with https://battleofai.net/ \'s API.
 
 A short summary of the basic features.
