@@ -52,17 +52,18 @@ class Client:
     def register_callback(self, callback: callable, game_type: GameType=None) -> None:
         """
         This is to register a callback for a game type.
-        :param callback: callable
+        :type callback: callable
+        :param callback:
 
-            A callable used
+            A callable used to make a turn.
 
-        :param game_type: `battleofai.abc.GameType`
+        :type game_type: :class:`battleofai.abc.GameType`
+        :param game_type:
 
             The game type to use this callback for.
             If None it's used for any game type where no other callback is specified.
-            Instance of :mcs:`battleofai.abc.GameType` (Subclass of :cls:`battleofai.abc.Match`)
-                e.g. :cls:`battleofai.Core`.
-
+            Instance of :class:`battleofai.abc.GameType` (Subclass of :class:`battleofai.abc.Match`)
+                e.g. :class:`battleofai.Core`.
         """
         self._callbacks[game_type.__game_name__ if game_type is not None else game_type] = callback
 

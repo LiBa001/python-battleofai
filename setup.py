@@ -28,7 +28,7 @@ setup(
     python_requires='>=3.6',
     keywords='wrapper library API AI python async',
     install_requires=['aiohttp'],
-    packages=find_packages(exclude=['tests', 'examples']),
+    packages=find_packages(exclude=['tests', 'examples', 'docs']),
     data_files=None,
     project_urls={
         'API': 'https://games.battleofai.net/api/',

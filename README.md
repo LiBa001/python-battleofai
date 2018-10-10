@@ -15,7 +15,7 @@ Object-oriented, asynchronous, easy2use solution for interacting with https://ba
 
 Latest stable version:
 ```bash
-pyhton3.6 -m pip install battleofai
+python3.6 -m pip install battleofai
 ```
 
 This branch (Alpha state):
