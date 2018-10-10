@@ -1,11 +1,9 @@
 
 [![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/LiBa001/python-battleofai/blob/master/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/LiBa001/python-battleofai.svg?style=social&label=Stars)](https://github.com/LiBa001/python-battleofai/stargazers)
 
 
 # Battle of AI - Python library
-
-[![GitHub stars](https://img.shields.io/github/stars/LiBa001/python-battleofai.svg?style=social&label=Stars)](https://github.com/LiBa001/python-battleofai/stargazers)
-
 
 [![PyPI version](https://badge.fury.io/py/battleofai.svg)](https://badge.fury.io/py/battleofai)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/battleofai.svg)](https://pypi.org/project/battleofai/)
@@ -13,7 +11,20 @@
 
 Object-oriented, asynchronous, easy2use solution for interacting with https://battleofai.net/ \'s APIs.
 
-A short summary of the basic features.
+## Install
+
+Latest stable version:
+```bash
+pyhton3.6 -m pip install battleofai
+```
+
+This branch (Alpha state):
+```bash
+python3.6 -m pip install -U git+https://github.com/LiBa001/python-battleofai@async
+```
+> **NOTE:** This requires `git` to be installed.
+
+## A short summary of the basic features.
 
 #### Configure your client easily.
 
