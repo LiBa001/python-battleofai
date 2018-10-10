@@ -1,12 +1,11 @@
-import requests
 from .enums import GameState
-from .utils import generate_get_uri
+from .http import HTTPClient
 
 
 class Game:
-    API_ENDPOINT = "https://games.battleofai.net/api/games/"
+    def __init__(self, http_client: HTTPClient):
+        self._http = http_client
 
-    def __init__(self):
         self._id = None
         self._name = None
         self._state = None
@@ -34,7 +33,7 @@ class Game:
 
     @property
     def players(self):
-        return self._players
+        return [player["id"] for player in self._players]
 
     @property
     def active_player(self):
@@ -53,12 +52,8 @@ class Game:
     def winning_player(self):
         return self._winning_player
 
-    def pull(self, game_id: int):
-        resp = requests.get(self.API_ENDPOINT + str(game_id))
-
-        assert resp.status_code == 200
-
-        info = resp.json()
+    async def pull(self, game_id: int):
+        info = await self._http.get_game(game_id)
 
         self._id = game_id
         self._name = info["game_name"]
@@ -69,42 +64,41 @@ class Game:
         self._history = info["history"]
         self._winning_player = info["winning_player"]
 
-    def update(self):
+    async def update(self):
         if self.id is not None:
-            self.pull(self.id)
+            await self.pull(self.id)
 
     @classmethod
-    def create(cls, game_name: str):
+    async def create(cls, http_client: HTTPClient, game_name: str):
         """
         creates a game
         :param game_name: The name of the game (e.g. 'Core')
+        :param http_client: The client to use for registration
         :return: the game
         """
-        url = cls.API_ENDPOINT + "createGame"
-
-        resp = requests.post(url, json={"game_name": game_name})
-        assert resp.status_code == 200
-
-        game_id = int(resp.text)
-
-        return cls.get(game_id)
+        game_id = await http_client.create_game(game_name)
+        return await cls.get(http_client, game_id)
 
     @classmethod
-    def get(cls, game_id: int):
-        game = cls()
-        game.pull(game_id)
+    async def get(cls, http_client: HTTPClient, game_id: int):
+        game = cls(http_client)
+        await game.pull(game_id)
         return game
 
     @classmethod
-    def list(cls, **kwargs):
-        resp = requests.get(generate_get_uri(cls.API_ENDPOINT, **kwargs))
+    async def get_all(cls, http_client: HTTPClient, **criteria):
+        game_ids = await http_client.get_games(**criteria)
 
-        assert resp.status_code == 200
+        for game_id in game_ids:
+            game = await cls.get(http_client, game_id)
+            yield game
 
-        return [cls.get(g['id']) for g in resp.json()['games']]
+    @classmethod
+    async def list(cls, http_client: HTTPClient, **criteria):
+        return [game async for game in cls.get_all(http_client, **criteria)]
 
-    def make_turn(self, data: dict):
-        return requests.post(self.API_ENDPOINT + str(self.id) + "/makeTurn", json=data)
+    async def make_turn(self, turn_data: tuple) -> bool:
+        return await self._http.make_turn(self.id, turn_data)
 
     def __repr__(self):
         return f"<Game id={self.id}>"

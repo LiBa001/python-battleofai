@@ -1,12 +1,20 @@
 from setuptools import setup, find_packages
+import re
 
-with open('Readme.md', 'r', encoding='utf-8') as f:
+
+with open('battleofai/__init__.py') as f:
+    version = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]', f.read(), re.MULTILINE).group(1)
+
+if not version:
+    raise RuntimeError('version is not set')
+
+with open('README.md', 'r', encoding='utf-8') as f:
     readme = f.read()
 
 setup(
     name='battleofai',
-    version='0.1.1',
-    description='A wrapper for the battleofai API.',
+    version=version,
+    description='A library for the battleofai API.',
     long_description=readme,
     long_description_content_type='text/markdown',
     url='https://github.com/LiBa001/python-battleofai',
@@ -18,8 +26,8 @@ setup(
         'Programming Language :: Python :: 3.6'
     ],
     python_requires='>=3.6',
-    keywords='wrapper library API AI python',
-    install_requires=['requests'],
+    keywords='wrapper library API AI python async',
+    install_requires=['aiohttp'],
     packages=find_packages(exclude=['tests', 'examples']),
     data_files=None,
     project_urls={

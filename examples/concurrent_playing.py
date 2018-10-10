@@ -1,4 +1,4 @@
-from battleofai import Client, Core
+from battleofai import Client, Core, GameSession
 
 
 client = Client(credentials=('username', 'password'))
@@ -19,9 +19,21 @@ async def turn(board, symbol):
 
 @client.on_ready
 async def main():
-    session = client.create_session(Core)
+    # play multiple games concurrently
+    session_1 = GameSession(Core, rejoin_ongoing_games=False, turn_interval=0.5, join_own_games=True)
+    session_2 = GameSession(Core, rejoin_ongoing_games=False, turn_interval=0.5, join_own_games=False)
 
-    await session.run()  # finds a match and plays the game
+    session_1.register_client(client)
+    session_1.run()
+
+    session_2.register_client(client)
+    session_2.run()
+
+    print(session_1.name, session_1.match, session_1.match.game)
+    print(session_2.name, session_2.match, session_2.match.game)
+
+    await session_1.task
+    await session_2.task
 
 
 client.run()

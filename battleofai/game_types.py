@@ -1,61 +1,49 @@
 from .abc import Match
 from .enums import GameState
+from .game import Game
 import logging
-import time
+import asyncio
 
 logger = logging.getLogger(__name__)
 
 
 class Core(Match):
-    def make_turn(self):
-        assert self.game is not None
-        self.game.update()
+    async def make_turn(self) -> bool:
+        game: Game = self.game
+        assert game is not None
+        await game.update()
 
-        assert self.game.state == GameState.STARTED
+        assert game.state == GameState.STARTED
         assert self.is_active
 
-        board = self.game.current_board
+        board = game.current_board
         symbol = self.symbol
 
-        x_pos, y_pos = self.callback(board, symbol)
+        turn_data = await self.callback(board, symbol)
+        is_ongoing = await game.make_turn(turn_data)
 
-        logger.info(f"MOVING TO ({str(x_pos)}, {str(y_pos)})")
+        logger.info(f"MOVING TO {', '.join(str(td) for td in [turn_data])}")
 
-        resp = None
-        status_code = 401
-        while status_code == 401:
-            self._client.check_and_update_token()
+        return is_ongoing
 
-            data = {"player": {"id": self._client.user_id, "token": self._client.token}, "turn": str([x_pos, y_pos])}
-
-            resp = self.game.make_turn(data)
-
-            status_code = resp.status_code
-
-        return resp
-
-    def play(self, turn_interval: int=5, matchmaking_interval: int=5):
-        game = self.game
+    async def play(self, turn_interval: int=5, matchmaking_interval: int=5) -> bool:
+        game: Game = self.game
 
         assert game is not None
 
-        game.update()
+        await game.update()
 
         counter = 0
         while game.state == GameState.WAITING:
             logger.info(f"WAITING FOR OTHER PLAYERS ({counter} sec.)")
-            time.sleep(matchmaking_interval)
+            await asyncio.sleep(matchmaking_interval)
             counter += matchmaking_interval
-            game.update()
+            await game.update()
 
         # check everything
-        registered = False
-        for counter, i in enumerate(self.game.players):
-            if i['id'] == self._client.user_id:
-                registered = True
-                break
+        my_id = self._http.user_id
 
-        assert registered
+        assert my_id in game.players
         assert game.name == self.__game_name__
         assert game.state == GameState.STARTED
         assert game.open_slots == 0
@@ -63,24 +51,21 @@ class Core(Match):
         # PLAY
         is_ongoing = True
 
-        logger.info("PLAYING THE GAME " + str(game.id))
+        logger.info(f"PLAYING THE GAME {game.id} ({my_id} vs. {', '.join([str(opp_id) for opp_id in self.opponents])})")
 
         while is_ongoing:
-            game.update()
+            await game.update()
 
             if not game.state == GameState.STARTED:
                 break
 
             if self.is_active:
-                resp = self.make_turn()
+                is_ongoing = await self.make_turn()
 
-                if resp.status_code == 200 and 'false' in resp.text:
-                    is_ongoing = False
-
-            time.sleep(turn_interval)
+            await asyncio.sleep(turn_interval)
 
         # evaluate result
-        game.update()
+        await game.update()
 
         return self.won
 

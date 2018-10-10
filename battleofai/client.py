@@ -1,76 +1,78 @@
-import requests
 from .config import Config
-from .game import Game
 from .abc import GameType
+from .game_session import GameSession
+from .http import HTTPClient
 import logging
+import asyncio
 
 
 logger = logging.getLogger(__name__)
 
 
 class Client:
-    ACCOUNT_API_ENDPOINT = "https://iam.battleofai.net/api/"
+    def __init__(self, username: str=None, password: str=None, *, credentials: tuple=None, loop=None, **options):
+        self.loop = asyncio.get_event_loop() if loop is None else loop
 
-    def __init__(self, credentials: tuple=None):
-        self.user_id = None
-        self.user_token = None
-        self.session_token = None
         self.config = Config()
+
+        self.set_credentials(username, password, credentials=credentials)
+
+        self._callbacks = {}
+        self._sessions = []
+        self._ready_callback = None
+
+        connector = options.pop('connector', None)
+        self.http = HTTPClient(connector, loop=self.loop)
+
+    def set_credentials(self, username: str=None, password: str=None, *, credentials: tuple=None):
+        self.config["username"] = username
+        self.config["password"] = password
 
         if credentials is not None:
             self.config["username"] = credentials[0]
             self.config["password"] = credentials[1]
 
-        self._callbacks = {}
+    async def login(self, username: str=None, password: str=None, *, credentials: tuple=None):
+        # update missing credentials
+        self.set_credentials(
+            username or self.config.username,
+            password or self.config.password,
+            credentials=credentials
+        )
 
-    @property
-    def token(self):
-        return str([self.user_token, self.session_token])
+        return await self.http.login(self.config.username, self.config.password)
 
-    def register(self, game: Game):
+    async def check_and_update_token(self):
+        valid = await self.http.validate_token()
+
+        if not valid:
+            logger.info("Token has expired; Requesting new one . . .")
+            return await self.login()
+
+    def register_callback(self, callback: callable, game_type: GameType=None) -> None:
         """
-        Registers the player for a match by id
-        :param game: The match to register on
+        This is to register a callback for a game type.
+        :param callback: callable
+
+            A callable used
+
+        :param game_type: `battleofai.abc.GameType`
+
+            The game type to use this callback for.
+            If None it's used for any game type where no other callback is specified.
+            Instance of :mcs:`battleofai.abc.GameType` (Subclass of :cls:`battleofai.abc.Match`)
+                e.g. :cls:`battleofai.Core`.
+
         """
-        url = game.API_ENDPOINT + str(game.id) + "/registerPlayer"
-        resp = requests.post(url, json={"id": self.user_id, "token": self.token})
-        assert resp.status_code == 200, f"StatusCode: {resp.status_code}"
+        self._callbacks[game_type.__game_name__ if game_type is not None else game_type] = callback
 
-        return 'true' in resp.text
-
-    def login(self):
+    def callback(self, game_type: GameType=None) -> callable:
         """
-        Logs a user in with credentials of the registration for obtaining valid credentials for playing a game.
-        :return: A tuple containing player_id and login token. Credentials are valid for 1 day.
+        Use this to decorate your callback functions.
+        Alternative to :meth:`register_callback`.
         """
-        login_data = {
-            "username": self.config.username,
-            "password": self.config.password
-        }
-        resp = requests.post(Client.ACCOUNT_API_ENDPOINT + "iam/login", json=login_data)
-        if not resp.status_code == 200:
-            exit("Account Management temporarily unavailable")
-
-        if resp.json()["userid"] is None or resp.json()["token"] is None or resp.json()["session_token"] is None:
-            exit("Invalid login credentials")
-
-        self.user_id = resp.json()["userid"]
-        self.user_token = resp.json()["token"]
-        self.session_token = resp.json()["session_token"]
-
-    def check_and_update_token(self):
-        data = {
-            "userid": self.user_id,
-            "token": self.user_token,
-            "session_token": self.session_token
-        }
-        resp = requests.post(Client.ACCOUNT_API_ENDPOINT + "iam/validateToken", json=data)
-        if not resp.status_code == 200 or not resp.json()["success"]:
-            self.login()
-
-    def callback(self, game_type: GameType=None):
         def decorator(callback: callable):
-            self._callbacks[game_type.__game_name__ if game_type is not None else game_type] = callback
+            self.register_callback(callback, game_type)
 
         return decorator
 
@@ -85,23 +87,63 @@ class Client:
 
         return callback
 
-    def play(self, game_type: GameType, callback: callable=None, rejoin_ongoing_games=False,
-             turn_interval: int=5, matchmaking_interval: int=5):
-        self.login()
+    def on_ready(self, func: callable):
+        self._ready_callback = func
 
-        if callback is None:
-            callback = self.get_callback(game_type)
-            assert callback is not None, "Need to specify callback function!"
+    @property
+    def sessions(self):
+        return self._sessions
 
-        match = game_type(callback=callback)
+    def register_session(self, session: GameSession):
+        session.register_client(self)
+        self._sessions.append(session)
 
-        if rejoin_ongoing_games:
-            match.rejoin_game(self)
+    def create_session(self, game_type: GameType, name: str=None, callback: callable=None, **kwargs) -> GameSession:
+        session = GameSession(game_type, name, callback, **kwargs)
+        self.register_session(session)
+        return session
 
-        match.join_game(self)
+    async def run_sessions(self):
+        for session in self.sessions:
+            session.run()
 
-        won = match.play(turn_interval=turn_interval, matchmaking_interval=matchmaking_interval)
+        await asyncio.gather(*[s.task for s in self.sessions])
 
-        logger.info(f"{'won' if won else 'lost'} game {match.game.id}")
+    async def start(self, *args, **kwargs):
+        await self.login(*args, **kwargs)
 
-        return won
+        if self._ready_callback is not None:
+            on_ready = self.loop.create_task(self._ready_callback())
+        else:
+            on_ready = None
+
+        await self.run_sessions()
+
+        if on_ready is not None:
+            await on_ready
+
+    def run(self, *args, **kwargs):
+        """
+        A blocking call that abstracts away the `event loop` initialisation from you.
+        If you want more control over the event loop then this
+        function should not be used.
+
+        Warning
+        --------
+        This function must be the last function to call due to the fact that it
+        is blocking. That means that registration of events or anything being
+        called after this function call will not execute until it returns.
+        """
+
+        loop = self.loop
+
+        try:
+            loop.run_until_complete(self.start(*args, **kwargs))
+        except KeyboardInterrupt:
+            logger.info('Received signal to terminate event loop.')
+        finally:
+            self.close()
+
+    def close(self):
+        self.loop.run_until_complete(self.http.close())
+        self.loop.close()
